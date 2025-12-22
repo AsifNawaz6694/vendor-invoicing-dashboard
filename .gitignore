@@ -1,0 +1,68 @@
+/.phpunit.cache
+/bootstrap/ssr
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/resources/js/actions
+/resources/js/routes
+/resources/js/wayfinder
+/storage/*.key
+/storage/pail
+/vendor
+.DS_Store
+.env
+.env.backup
+.env.production
+.env.local
+.env.*.local
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+/.claude
+
+# Screenshots and images (development only)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+
+# Log files
+/storage/logs/*.log
+
+# Cache files
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+!/storage/framework/cache/.gitkeep
+!/storage/framework/sessions/.gitkeep
+!/storage/framework/views/.gitkeep
+
+# Compiled assets (should be built on server)
+/public/build/*
+!/public/build/.gitkeep
+
+# Debugbar
+/storage/debugbar/*
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Nested duplicate folder
+/vendor-invoicing-dashboard/
