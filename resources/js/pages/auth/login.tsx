@@ -11,6 +11,7 @@ import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 import { Form, Head, usePage } from '@inertiajs/react';
 
+
 interface LoginProps {
     status?: string;
     canResetPassword: boolean;
