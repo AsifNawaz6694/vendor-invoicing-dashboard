@@ -66,3 +66,6 @@ Thumbs.db
 
 # Nested duplicate folder
 /vendor-invoicing-dashboard/
+
+# GitHub Actions (add back when token has workflow scope)
+/.github/
