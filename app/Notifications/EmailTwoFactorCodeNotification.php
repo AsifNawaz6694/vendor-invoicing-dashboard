@@ -27,13 +27,14 @@ class EmailTwoFactorCodeNotification extends Notification
         $expiryMinutes = config('two-factor.email.expiry_minutes', 10);
 
         return (new MailMessage)
-            ->subject('Your Login Verification Code - ' . config('app.name'))
+            ->subject('Raqtan Vendor Tool - Login Verification Code')
             ->greeting('Hello ' . $notifiable->name . '!')
-            ->line('Your verification code is:')
+            ->line('Your secure verification code for Raqtan Vendor Tool is:')
             ->line('**' . $code . '**')
-            ->line('This code will expire in ' . $expiryMinutes . ' minutes.')
-            ->line('If you did not request this code, please ignore this email and ensure your account is secure.')
-            ->salutation('Regards, ' . config('app.name'));
+            ->line('This code will expire in ' . $expiryMinutes . ' minutes for security purposes.')
+            ->line('Please enter this code to complete your login to the Vendor Invoicing and Payment Release Dashboard.')
+            ->line('If you did not attempt to log in, please ignore this email and contact your system administrator if you suspect unauthorized access.')
+            ->salutation('Best Regards, The Raqtan Vendor Tool Security Team');
     }
 
     /**

@@ -15,10 +15,17 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { MoreHorizontal, Plus, Search, UserCheck, UserX, Mail, Key, Trash2, Pencil } from 'lucide-react';
+import { MoreHorizontal, Plus, Search, UserCheck, UserX, Mail, Key, Trash2, Pencil, Download, Filter } from 'lucide-react';
 import { useState } from 'react';
 
 interface User {
@@ -31,6 +38,7 @@ interface User {
     email_verified_at: string | null;
     created_at: string;
     creator?: { id: number; name: string } | null;
+    role?: { id: number; name: string } | null;
 }
 
 interface UsersIndexProps {
@@ -49,11 +57,46 @@ interface UsersIndexProps {
 
 export default function UsersIndex({ users, filters }: UsersIndexProps) {
     const [search, setSearch] = useState(filters.search || '');
+    const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
+    const [adminFilter, setAdminFilter] = useState(filters.admin || 'all');
+    const [twoFaFilter, setTwoFaFilter] = useState(filters['2fa'] || 'all');
+    const [roleFilter, setRoleFilter] = useState(filters.role || 'all');
     const { flash } = usePage().props as any;
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get('/admin/users', { search }, { preserveState: true });
+        applyFilters();
+    };
+
+    const applyFilters = () => {
+        const params: any = {};
+        if (search) params.search = search;
+        if (statusFilter && statusFilter !== 'all') params.status = statusFilter;
+        if (adminFilter && adminFilter !== 'all') params.admin = adminFilter;
+        if (twoFaFilter && twoFaFilter !== 'all') params['2fa'] = twoFaFilter;
+        if (roleFilter && roleFilter !== 'all') params.role = roleFilter;
+
+        router.get('/admin/users', params, { preserveState: true });
+    };
+
+    const handleExport = () => {
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+        if (adminFilter && adminFilter !== 'all') params.append('admin', adminFilter);
+        if (twoFaFilter && twoFaFilter !== 'all') params.append('2fa', twoFaFilter);
+        if (roleFilter && roleFilter !== 'all') params.append('role', roleFilter);
+
+        window.location.href = `/admin/users-export?${params.toString()}`;
+    };
+
+    const clearFilters = () => {
+        setSearch('');
+        setStatusFilter('all');
+        setAdminFilter('all');
+        setTwoFaFilter('all');
+        setRoleFilter('all');
+        router.get('/admin/users', {}, { preserveState: true });
     };
 
     const handleToggleStatus = (user: User) => {
@@ -85,17 +128,23 @@ export default function UsersIndex({ users, filters }: UsersIndexProps) {
             <div className="space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold">User Management</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+                        <p className="text-muted-foreground mt-2">
                             Manage user accounts and permissions
                         </p>
                     </div>
-                    <Link href="/admin/users/create">
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add User
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleExport}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Export CSV
                         </Button>
-                    </Link>
+                        <Link href="/admin/users/create">
+                            <Button>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add User
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
                 {flash?.success && (
@@ -110,18 +159,66 @@ export default function UsersIndex({ users, filters }: UsersIndexProps) {
                     </div>
                 )}
 
-                <div className="flex items-center gap-4">
-                    <form onSubmit={handleSearch} className="flex-1">
-                        <div className="relative max-w-sm">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                placeholder="Search users..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-9"
-                            />
-                        </div>
-                    </form>
+                <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <form onSubmit={handleSearch} className="flex-1">
+                            <div className="relative max-w-sm">
+                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search users..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                        </form>
+
+                        <Button type="button" variant="outline" onClick={applyFilters}>
+                            <Filter className="mr-2 h-4 w-4" />
+                            Apply Filters
+                        </Button>
+
+                        {(search || statusFilter !== 'all' || adminFilter !== 'all' || twoFaFilter !== 'all' || roleFilter !== 'all') && (
+                            <Button type="button" variant="ghost" onClick={clearFilters}>
+                                Clear All
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-[150px]">
+                                <SelectValue placeholder="All Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select value={adminFilter} onValueChange={setAdminFilter}>
+                            <SelectTrigger className="w-[150px]">
+                                <SelectValue placeholder="All Users" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Users</SelectItem>
+                                <SelectItem value="yes">Admin Only</SelectItem>
+                                <SelectItem value="no">Non-Admin</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select value={twoFaFilter} onValueChange={setTwoFaFilter}>
+                            <SelectTrigger className="w-[150px]">
+                                <SelectValue placeholder="All 2FA" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All 2FA</SelectItem>
+                                <SelectItem value="enabled">2FA Enabled</SelectItem>
+                                <SelectItem value="disabled">2FA Disabled</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 <div className="rounded-md border">
@@ -164,10 +261,12 @@ export default function UsersIndex({ users, filters }: UsersIndexProps) {
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            {user.is_admin ? (
-                                                <Badge variant="destructive">Admin</Badge>
+                                            {user.role ? (
+                                                <Badge variant={user.is_admin ? 'destructive' : 'outline'}>
+                                                    {user.role.name}
+                                                </Badge>
                                             ) : (
-                                                <span className="text-muted-foreground text-sm">User</span>
+                                                <span className="text-muted-foreground text-sm">No role</span>
                                             )}
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">

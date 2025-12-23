@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -21,7 +22,7 @@ class UserController extends Controller
     public function index(Request $request): Response
     {
         $query = User::query()
-            ->with('creator:id,name')
+            ->with(['creator:id,name', 'role:id,name'])
             ->withCount('createdUsers');
 
         // Search
@@ -55,7 +56,11 @@ class UserController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('admin/users/create');
+        $roles = \App\Models\Role::orderBy('name')->get(['id', 'name', 'description']);
+
+        return Inertia::render('admin/users/create', [
+            'roles' => $roles,
+        ]);
     }
 
     /**
@@ -66,6 +71,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'role_id' => ['required', 'exists:roles,id'],
             'is_admin' => ['boolean'],
             'send_welcome_email' => ['boolean'],
         ]);
@@ -78,6 +84,9 @@ class UserController extends Controller
             'is_active' => true,
             'created_by' => $request->user()->id,
         ]);
+
+        // Assign the selected role to the user
+        $user->assignRole($validated['role_id']);
 
         if ($validated['send_welcome_email'] ?? true) {
             $user->notify(new WelcomeUserNotification());
@@ -92,8 +101,12 @@ class UserController extends Controller
      */
     public function edit(User $user): Response
     {
+        $roles = \App\Models\Role::orderBy('name')->get(['id', 'name', 'description']);
+        $user->load(['creator:id,name', 'role:id,name']);
+
         return Inertia::render('admin/users/edit', [
-            'user' => $user->load('creator:id,name'),
+            'user' => $user,
+            'roles' => $roles,
         ]);
     }
 
@@ -105,6 +118,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'role_id' => ['nullable', 'exists:roles,id'],
             'is_admin' => ['boolean'],
         ]);
 
@@ -118,6 +132,11 @@ class UserController extends Controller
             'email' => strtolower($validated['email']),
             'is_admin' => $validated['is_admin'] ?? false,
         ]);
+
+        // Update role if provided
+        if (isset($validated['role_id'])) {
+            $user->syncRoles([$validated['role_id']]);
+        }
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User updated successfully.');
@@ -181,5 +200,97 @@ class UserController extends Controller
         $user->notify(new WelcomeUserNotification());
 
         return back()->with('success', 'Welcome email sent successfully.');
+    }
+
+    /**
+     * Export users to CSV.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $query = User::query()
+            ->with(['creator:id,name', 'role:id,name']);
+
+        // Apply same filters as index
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->has('status')) {
+            $query->where('is_active', $request->input('status') === 'active');
+        }
+
+        if ($request->has('admin')) {
+            $query->where('is_admin', $request->input('admin') === 'yes');
+        }
+
+        if ($request->has('role')) {
+            $query->whereHas('role', function ($q) use ($request) {
+                $q->where('id', $request->input('role'));
+            });
+        }
+
+        if ($request->has('2fa')) {
+            if ($request->input('2fa') === 'enabled') {
+                $query->whereNotNull('two_factor_method');
+            } else {
+                $query->whereNull('two_factor_method');
+            }
+        }
+
+        $users = $query->latest()->get();
+
+        $filename = 'users_export_' . date('Y-m-d_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0'
+        ];
+
+        $callback = function () use ($users) {
+            $file = fopen('php://output', 'w');
+
+            // Add BOM for Excel UTF-8 compatibility
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // Add headers
+            fputcsv($file, [
+                'ID',
+                'Name',
+                'Email',
+                'Role',
+                'Status',
+                'Admin',
+                '2FA Method',
+                'Email Verified',
+                'Created By',
+                'Created At'
+            ]);
+
+            // Add data
+            foreach ($users as $user) {
+                fputcsv($file, [
+                    $user->id,
+                    $user->name,
+                    $user->email,
+                    $user->role?->name ?? 'No Role',
+                    $user->is_active ? 'Active' : 'Inactive',
+                    $user->is_admin ? 'Yes' : 'No',
+                    $user->two_factor_method ?? 'Not Enabled',
+                    $user->email_verified_at ? 'Yes' : 'No',
+                    $user->creator?->name ?? 'System',
+                    $user->created_at->format('Y-m-d H:i:s')
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }

@@ -8,7 +8,8 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, variant = 'header' }: AppShellProps) {
-    const isOpen = usePage<SharedData>().props.sidebarOpen;
+    // Default sidebar to collapsed
+    const isOpen = false;
 
     if (variant === 'header') {
         return (

@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\GoogleController;
 use App\Http\Controllers\Auth\PasswordSetupController;
 use App\Http\Controllers\Auth\TwoFactorAuthenticatedSessionController;
 use App\Http\Controllers\Auth\TwoFactorSetupController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -30,9 +31,7 @@ Route::post('two-factor-challenge/resend', [TwoFactorAuthenticatedSessionControl
     ->name('two-factor.resend');
 
 Route::middleware(['auth', 'verified', '2fa.setup'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 });
 
 // 2FA setup route (requires auth but not 2fa.setup middleware)
@@ -42,3 +41,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
+require __DIR__.'/secure.php';

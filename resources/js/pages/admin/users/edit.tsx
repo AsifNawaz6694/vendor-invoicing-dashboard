@@ -6,10 +6,23 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowLeft, Key, Mail, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+
+interface Role {
+    id: number;
+    name: string;
+    description?: string;
+}
 
 interface User {
     id: number;
@@ -22,18 +35,21 @@ interface User {
     email_verified_at: string | null;
     created_at: string;
     creator?: { id: number; name: string } | null;
+    role?: Role | null;
 }
 
 interface EditUserProps {
     user: User;
+    roles: Role[];
 }
 
-export default function EditUser({ user }: EditUserProps) {
+export default function EditUser({ user, roles }: EditUserProps) {
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [formData, setFormData] = useState({
         name: user.name,
         email: user.email,
+        role_id: user.role ? user.role.id.toString() : '',
         is_admin: user.is_admin,
     });
     const { flash } = usePage().props as any;
@@ -85,8 +101,8 @@ export default function EditUser({ user }: EditUserProps) {
                         </Button>
                     </Link>
                     <div className="flex-1">
-                        <h1 className="text-2xl font-semibold">Edit User</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="text-3xl font-bold tracking-tight">Edit User</h1>
+                        <p className="text-muted-foreground mt-2">
                             Update user information and settings
                         </p>
                     </div>
@@ -140,6 +156,38 @@ export default function EditUser({ user }: EditUserProps) {
                                         required
                                     />
                                     <InputError message={errors.email} />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="role">Role</Label>
+                                    <Select
+                                        value={formData.role_id}
+                                        onValueChange={(value) => setFormData({ ...formData, role_id: value })}
+                                    >
+                                        <SelectTrigger id="role">
+                                            <SelectValue placeholder="Select a role" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {roles.map((role) => (
+                                                <SelectItem key={role.id} value={role.id.toString()}>
+                                                    <div>
+                                                        <div className="font-medium">{role.name}</div>
+                                                        {role.description && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {role.description}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={errors.role_id} />
+                                    {user.role && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Current role: {user.role.name}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center space-x-3">

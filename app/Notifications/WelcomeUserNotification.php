@@ -41,14 +41,15 @@ class WelcomeUserNotification extends Notification
         $setupUrl = url('/password/setup/' . $token);
 
         return (new MailMessage)
-            ->subject('Welcome to ' . config('app.name') . ' - Set Up Your Account')
+            ->subject('Welcome to Raqtan Vendor Tool - Account Setup')
             ->greeting('Welcome, ' . $notifiable->name . '!')
-            ->line('An account has been created for you at ' . config('app.name') . '.')
+            ->line('Your account has been created for the Raqtan Vendor Invoicing and Payment Release Dashboard.')
             ->line('Please click the button below to set up your password and complete your account setup.')
             ->action('Set Up Password', $setupUrl)
-            ->line('This link will expire in 48 hours.')
-            ->line('If you did not expect this email, please contact your administrator.')
-            ->salutation('Regards, ' . config('app.name'));
+            ->line('This link will expire in 48 hours for security purposes.')
+            ->line('After setting your password, you will need to authenticate with Two-Factor Authentication (2FA) to access the system.')
+            ->line('If you did not expect this email, please contact your system administrator immediately.')
+            ->salutation('Best Regards, The Raqtan Vendor Tool Team');
     }
 
     /**

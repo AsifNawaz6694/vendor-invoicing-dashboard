@@ -5,17 +5,35 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 
-export default function CreateUser() {
+interface Role {
+    id: number;
+    name: string;
+    description?: string;
+}
+
+interface Props {
+    roles: Role[];
+}
+
+export default function CreateUser({ roles }: Props) {
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [formData, setFormData] = useState({
         name: '',
         email: '',
+        role_id: '',
         is_admin: false,
         send_welcome_email: true,
     });
@@ -42,8 +60,8 @@ export default function CreateUser() {
                         </Button>
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-semibold">Create User</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="text-3xl font-bold tracking-tight">Create User</h1>
+                        <p className="text-muted-foreground mt-2">
                             Add a new user to the system
                         </p>
                     </div>
@@ -81,6 +99,34 @@ export default function CreateUser() {
                                     required
                                 />
                                 <InputError message={errors.email} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="role">Role</Label>
+                                <Select
+                                    value={formData.role_id}
+                                    onValueChange={(value) => setFormData({ ...formData, role_id: value })}
+                                    required
+                                >
+                                    <SelectTrigger id="role">
+                                        <SelectValue placeholder="Select a role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {roles.map((role) => (
+                                            <SelectItem key={role.id} value={role.id.toString()}>
+                                                <div>
+                                                    <div className="font-medium">{role.name}</div>
+                                                    {role.description && (
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {role.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.role_id} />
                             </div>
 
                             <div className="flex items-center space-x-3">

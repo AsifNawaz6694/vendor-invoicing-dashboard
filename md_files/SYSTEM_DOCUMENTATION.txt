@@ -1,0 +1,716 @@
+================================================================================
+                    RAQTAN VENDOR TOOL - SYSTEM DOCUMENTATION
+                    Version: 1.0
+                    Date: December 23, 2025
+                    Platform: Vendor Invoicing and Payment Release Dashboard
+================================================================================
+
+================================================================================
+1. SYSTEM OVERVIEW
+================================================================================
+
+1.1 PROJECT INFORMATION
+   • Project Name: Raqtan Vendor Tool
+   • Purpose: Vendor Invoicing and Payment Release Dashboard
+   • Framework: Laravel 11
+   • Frontend: React with TypeScript + Inertia.js
+   • Database: MySQL
+   • Authentication: Laravel Fortify with 2FA
+   • UI Framework: Tailwind CSS + shadcn/ui components
+
+1.2 KEY FEATURES
+   • User Authentication with mandatory 2FA
+   • Role-Based Access Control (RBAC)
+   • Permission Management System
+   • User Management
+   • Google OAuth Integration
+   • Email-based and TOTP 2FA Support
+   • Secure Password Setup Flow
+   • Admin Dashboard
+
+================================================================================
+2. DATABASE SCHEMA
+================================================================================
+
+2.1 USERS TABLE (users)
+   Fields:
+   • id                         - BIGINT UNSIGNED, PRIMARY KEY, AUTO_INCREMENT
+   • name                       - VARCHAR(255), NOT NULL
+   • email                      - VARCHAR(255), UNIQUE, NOT NULL
+   • email_verified_at          - TIMESTAMP, NULLABLE
+   • password                   - VARCHAR(255), NOT NULL
+   • google_id                  - VARCHAR(255), NULLABLE, INDEX
+   • avatar                     - VARCHAR(255), NULLABLE
+   • two_factor_secret          - TEXT, NULLABLE
+   • two_factor_recovery_codes  - TEXT, NULLABLE
+   • two_factor_confirmed_at    - TIMESTAMP, NULLABLE
+   • two_factor_method          - ENUM('email', 'totp'), NULLABLE
+   • email_two_factor_code      - VARCHAR(6), NULLABLE
+   • email_two_factor_expires_at - TIMESTAMP, NULLABLE
+   • is_admin                   - BOOLEAN, DEFAULT: false
+   • is_active                  - BOOLEAN, DEFAULT: true
+   • role_id                    - BIGINT UNSIGNED, NULLABLE, FOREIGN KEY
+   • created_by                 - BIGINT UNSIGNED, NULLABLE, FOREIGN KEY
+   • remember_token             - VARCHAR(100), NULLABLE
+   • created_at                 - TIMESTAMP
+   • updated_at                 - TIMESTAMP
+
+   Relationships:
+   • Belongs to one Role (role_id → roles.id)
+   • Belongs to one Creator User (created_by → users.id)
+   • Has many Created Users
+
+2.2 ROLES TABLE (roles)
+   Fields:
+   • id             - BIGINT UNSIGNED, PRIMARY KEY, AUTO_INCREMENT
+   • name           - VARCHAR(255), NOT NULL
+   • slug           - VARCHAR(255), UNIQUE, NOT NULL
+   • description    - VARCHAR(500), NULLABLE
+   • is_system      - BOOLEAN, DEFAULT: false
+   • created_at     - TIMESTAMP
+   • updated_at     - TIMESTAMP
+
+   Relationships:
+   • Has many Users
+   • Has many Permissions (through role_permission pivot)
+
+2.3 PERMISSIONS TABLE (permissions)
+   Fields:
+   • id             - BIGINT UNSIGNED, PRIMARY KEY, AUTO_INCREMENT
+   • name           - VARCHAR(255), NOT NULL
+   • slug           - VARCHAR(255), UNIQUE, NOT NULL
+   • description    - VARCHAR(500), NULLABLE
+   • module         - VARCHAR(100), NULLABLE
+   • is_system      - BOOLEAN, DEFAULT: false
+   • created_at     - TIMESTAMP
+   • updated_at     - TIMESTAMP
+
+   Relationships:
+   • Belongs to many Roles (through role_permission pivot)
+
+2.4 ROLE_PERMISSION TABLE (role_permission) - Pivot Table
+   Fields:
+   • id             - BIGINT UNSIGNED, PRIMARY KEY, AUTO_INCREMENT
+   • role_id        - BIGINT UNSIGNED, NOT NULL, FOREIGN KEY
+   • permission_id  - BIGINT UNSIGNED, NOT NULL, FOREIGN KEY
+   • created_at     - TIMESTAMP
+   • updated_at     - TIMESTAMP
+
+   Indexes:
+   • Composite Unique Index on (role_id, permission_id)
+   • Index on role_id
+   • Index on permission_id
+
+2.5 PASSWORD_SETUP_TOKENS TABLE (password_setup_tokens)
+   Fields:
+   • id             - BIGINT UNSIGNED, PRIMARY KEY, AUTO_INCREMENT
+   • user_id        - BIGINT UNSIGNED, NOT NULL, FOREIGN KEY
+   • token          - VARCHAR(64), UNIQUE, NOT NULL, INDEX
+   • expires_at     - TIMESTAMP, NOT NULL
+   • created_at     - TIMESTAMP
+   • updated_at     - TIMESTAMP
+
+   Relationships:
+   • Belongs to one User
+
+2.6 PASSWORD_RESET_TOKENS TABLE (password_reset_tokens)
+   Fields:
+   • email          - VARCHAR(255), PRIMARY KEY
+   • token          - VARCHAR(255), NOT NULL
+   • created_at     - TIMESTAMP, NULLABLE
+
+2.7 SESSIONS TABLE (sessions)
+   Fields:
+   • id             - VARCHAR(255), PRIMARY KEY
+   • user_id        - BIGINT UNSIGNED, NULLABLE, INDEX
+   • ip_address     - VARCHAR(45), NULLABLE
+   • user_agent     - TEXT, NULLABLE
+   • payload        - LONGTEXT, NOT NULL
+   • last_activity  - INTEGER, NOT NULL, INDEX
+
+2.8 CACHE TABLE (cache)
+   Fields:
+   • key            - VARCHAR(255), PRIMARY KEY
+   • value          - MEDIUMTEXT, NOT NULL
+   • expiration     - INTEGER, NOT NULL
+
+2.9 CACHE_LOCKS TABLE (cache_locks)
+   Fields:
+   • key            - VARCHAR(255), PRIMARY KEY
+   • owner          - VARCHAR(255), NOT NULL
+   • expiration     - INTEGER, NOT NULL
+
+2.10 JOBS TABLE (jobs)
+   Fields:
+   • id             - BIGINT UNSIGNED, PRIMARY KEY, AUTO_INCREMENT
+   • queue          - VARCHAR(255), NOT NULL, INDEX
+   • payload        - LONGTEXT, NOT NULL
+   • attempts       - TINYINT UNSIGNED, NOT NULL
+   • reserved_at    - INTEGER UNSIGNED, NULLABLE
+   • available_at   - INTEGER UNSIGNED, NOT NULL
+   • created_at     - INTEGER UNSIGNED, NOT NULL
+
+2.11 JOB_BATCHES TABLE (job_batches)
+   Fields:
+   • id             - VARCHAR(255), PRIMARY KEY
+   • name           - VARCHAR(255), NOT NULL
+   • total_jobs     - INTEGER, NOT NULL
+   • pending_jobs   - INTEGER, NOT NULL
+   • failed_jobs    - INTEGER, NOT NULL
+   • failed_job_ids - LONGTEXT, NOT NULL
+   • options        - MEDIUMTEXT, NULLABLE
+   • cancelled_at   - INTEGER, NULLABLE
+   • created_at     - INTEGER, NOT NULL
+   • finished_at    - INTEGER, NULLABLE
+
+2.12 FAILED_JOBS TABLE (failed_jobs)
+   Fields:
+   • id             - BIGINT UNSIGNED, PRIMARY KEY, AUTO_INCREMENT
+   • uuid           - VARCHAR(255), UNIQUE, NOT NULL
+   • connection     - TEXT, NOT NULL
+   • queue          - TEXT, NOT NULL
+   • payload        - LONGTEXT, NOT NULL
+   • exception      - LONGTEXT, NOT NULL
+   • failed_at      - TIMESTAMP, NOT NULL, DEFAULT: CURRENT_TIMESTAMP
+
+================================================================================
+3. AUTHENTICATION MODULE
+================================================================================
+
+3.1 AUTHENTICATION FEATURES
+   • Email/Password Login
+   • Google OAuth Login
+   • Two-Factor Authentication (2FA)
+     - Email-based OTP
+     - TOTP (Time-based One-Time Password)
+   • Password Reset Flow
+   • Welcome Email with Password Setup
+   • Remember Me Functionality
+   • Session Management
+
+3.2 AUTHENTICATION FLOW
+   • User Registration → Admin Creates User
+   • Welcome Email Sent → Contains Password Setup Link
+   • User Sets Password → Redirected to Login
+   • 2FA Automatically Enabled → Email 2FA by Default
+   • Login → Email/Password → 2FA Challenge → Dashboard
+
+3.3 AUTHENTICATION CONTROLLERS
+   • AuthenticatedSessionController
+     - Login/Logout handling
+     - Session management
+   • GoogleController
+     - OAuth callback handling
+     - Account linking
+   • PasswordSetupController
+     - Welcome email password setup
+     - Token validation
+   • TwoFactorAuthenticatedSessionController
+     - 2FA verification
+     - Code validation
+   • TwoFactorSetupController
+     - 2FA method selection
+     - TOTP setup and verification
+
+3.4 AUTHENTICATION MIDDLEWARE
+   • auth - Requires authenticated user
+   • guest - Only for non-authenticated users
+   • verified - Requires email verification
+   • two-factor - Enforces 2FA setup
+
+================================================================================
+4. USER MANAGEMENT MODULE
+================================================================================
+
+4.1 USER MANAGEMENT FEATURES
+   • Create New Users
+   • Edit User Information
+   • Assign Roles to Users
+   • Activate/Deactivate Users
+   • Reset User Passwords
+   • Resend Welcome Emails
+   • Delete Users
+   • View User List with Search
+   • Filter by Status/Role
+
+4.2 USER CONTROLLER ACTIONS
+   • index() - List all users with pagination
+   • create() - Show create user form
+   • store() - Save new user
+   • edit() - Show edit user form
+   • update() - Update user information
+   • destroy() - Delete user
+   • toggleStatus() - Activate/Deactivate
+   • resetPassword() - Send password reset
+   • resendWelcome() - Resend welcome email
+
+4.3 USER RELATIONSHIPS
+   • User → Role (Many-to-One)
+   • User → Creator (Self-referential)
+   • User → Created Users (One-to-Many)
+
+4.4 USER PERMISSIONS
+   • users.view - View user list
+   • users.create - Create new users
+   • users.edit - Edit users
+   • users.delete - Delete users
+   • users.manage - Full user management
+
+================================================================================
+5. ROLE MANAGEMENT MODULE
+================================================================================
+
+5.1 ROLE FEATURES
+   • Create Custom Roles
+   • Edit Role Information
+   • Assign Permissions to Roles
+   • Delete Non-System Roles
+   • View Role List
+   • System Role Protection
+
+5.2 ROLE CONTROLLER ACTIONS
+   • index() - List all roles
+   • create() - Show create role form
+   • store() - Save new role
+   • edit() - Show edit role form
+   • update() - Update role and permissions
+   • destroy() - Delete role
+   • assignPermissions() - Bulk assign permissions
+   • removePermissions() - Bulk remove permissions
+
+5.3 DEFAULT SYSTEM ROLES
+   • Super Admin - Full system access
+   • Admin - Administrative access
+   • Vendor - Vendor-specific access
+   • Accountant - Financial operations access
+
+5.4 ROLE RELATIONSHIPS
+   • Role → Users (One-to-Many)
+   • Role → Permissions (Many-to-Many)
+
+================================================================================
+6. PERMISSION MANAGEMENT MODULE
+================================================================================
+
+6.1 PERMISSION FEATURES
+   • Create Custom Permissions
+   • Edit Permission Details
+   • Group by Modules
+   • Delete Non-System Permissions
+   • Bulk Permission Operations
+   • Module-based Filtering
+
+6.2 PERMISSION MODULES
+   • Role Management
+   • Permission Management
+   • User Management
+   • Invoice Management
+   • Payment Management
+   • Reports & Analytics
+   • System Settings
+   • Audit Logs
+
+6.3 PERMISSION CONTROLLER ACTIONS
+   • index() - List all permissions
+   • create() - Show create permission form
+   • store() - Save new permission
+   • edit() - Show edit permission form
+   • update() - Update permission
+   • destroy() - Delete permission
+   • getGroupedByModule() - Get permissions by module
+   • bulkStore() - Create multiple permissions
+   • syncModule() - Sync module permissions
+
+6.4 PERMISSION FORMAT
+   • Name: Human-readable (e.g., "View Reports")
+   • Slug: System identifier (e.g., "reports.view")
+   • Module: Grouping category
+   • Description: Detailed explanation
+
+================================================================================
+7. FUNCTIONAL REQUIREMENTS
+================================================================================
+
+7.1 USER AUTHENTICATION
+   • FR-001: Users must authenticate with email and password
+   • FR-002: System must support Google OAuth login
+   • FR-003: 2FA must be mandatory for all users
+   • FR-004: Password reset via email must be available
+   • FR-005: Session timeout after inactivity
+
+7.2 USER MANAGEMENT
+   • FR-006: Admin can create new users
+   • FR-007: Admin can edit user information
+   • FR-008: Admin can assign roles to users
+   • FR-009: Admin can deactivate user accounts
+   • FR-010: System sends welcome email to new users
+
+7.3 ROLE & PERMISSION MANAGEMENT
+   • FR-011: Admin can create custom roles
+   • FR-012: Admin can assign permissions to roles
+   • FR-013: System protects system roles from modification
+   • FR-014: Permissions control access to features
+   • FR-015: Role changes take effect immediately
+
+7.4 SECURITY
+   • FR-016: Passwords must meet complexity requirements
+   • FR-017: 2FA codes expire after 10 minutes
+   • FR-018: Failed login attempts are logged
+   • FR-019: Sessions are invalidated on logout
+   • FR-020: CSRF protection on all forms
+
+================================================================================
+8. NON-FUNCTIONAL REQUIREMENTS
+================================================================================
+
+8.1 PERFORMANCE
+   • NFR-001: Page load time < 3 seconds
+   • NFR-002: API response time < 1 second
+   • NFR-003: Support 100+ concurrent users
+   • NFR-004: Database queries optimized with indexes
+   • NFR-005: Frontend assets minified and cached
+
+8.2 SECURITY
+   • NFR-006: HTTPS required for all connections
+   • NFR-007: Passwords hashed with bcrypt (12 rounds)
+   • NFR-008: SQL injection prevention via Eloquent ORM
+   • NFR-009: XSS protection via React
+   • NFR-010: Rate limiting on authentication endpoints
+
+8.3 USABILITY
+   • NFR-011: Responsive design for all screen sizes
+   • NFR-012: Intuitive navigation structure
+   • NFR-013: Clear error messages
+   • NFR-014: Accessibility standards compliance
+   • NFR-015: Dark mode support
+
+8.4 RELIABILITY
+   • NFR-016: 99.9% uptime target
+   • NFR-017: Automated backups daily
+   • NFR-018: Error logging and monitoring
+   • NFR-019: Graceful error handling
+   • NFR-020: Transaction rollback on failures
+
+8.5 MAINTAINABILITY
+   • NFR-021: Modular code architecture
+   • NFR-022: Comprehensive code documentation
+   • NFR-023: Unit test coverage > 70%
+   • NFR-024: Version control with Git
+   • NFR-025: Database migrations for schema changes
+
+================================================================================
+9. API ENDPOINTS
+================================================================================
+
+9.1 AUTHENTICATION ENDPOINTS
+   • POST   /login                      - User login
+   • POST   /logout                     - User logout
+   • GET    /forgot-password            - Show forgot password form
+   • POST   /forgot-password            - Send reset link
+   • GET    /reset-password/{token}     - Show reset form
+   • POST   /reset-password             - Reset password
+   • GET    /password/setup/{token}     - Show password setup
+   • POST   /password/setup/{token}     - Set initial password
+   • GET    /auth/google                - Initiate Google OAuth
+   • GET    /auth/google/callback       - Google OAuth callback
+   • GET    /two-factor-challenge       - Show 2FA form
+   • POST   /two-factor-challenge       - Verify 2FA code
+   • GET    /two-factor/setup           - Show 2FA setup
+   • POST   /two-factor/enable          - Enable 2FA
+   • DELETE /two-factor/disable         - Disable 2FA
+
+9.2 USER MANAGEMENT ENDPOINTS
+   • GET    /admin/users                - List users
+   • GET    /admin/users/create         - Create user form
+   • POST   /admin/users                - Store new user
+   • GET    /admin/users/{id}/edit      - Edit user form
+   • PUT    /admin/users/{id}           - Update user
+   • DELETE /admin/users/{id}           - Delete user
+   • POST   /admin/users/{id}/toggle-status - Toggle active status
+   • POST   /admin/users/{id}/reset-password - Reset password
+   • POST   /admin/users/{id}/resend-welcome - Resend welcome
+
+9.3 ROLE MANAGEMENT ENDPOINTS
+   • GET    /admin/roles                - List roles
+   • GET    /admin/roles/create         - Create role form
+   • POST   /admin/roles                - Store new role
+   • GET    /admin/roles/{id}/edit      - Edit role form
+   • PUT    /admin/roles/{id}           - Update role
+   • DELETE /admin/roles/{id}           - Delete role
+   • POST   /admin/roles/{id}/permissions - Assign permissions
+   • DELETE /admin/roles/{id}/permissions - Remove permissions
+
+9.4 PERMISSION MANAGEMENT ENDPOINTS
+   • GET    /admin/permissions          - List permissions
+   • GET    /admin/permissions/create   - Create permission form
+   • POST   /admin/permissions          - Store permission
+   • GET    /admin/permissions/{id}/edit - Edit permission form
+   • PUT    /admin/permissions/{id}     - Update permission
+   • DELETE /admin/permissions/{id}     - Delete permission
+   • GET    /admin/permissions/grouped  - Get grouped by module
+   • POST   /admin/permissions/bulk     - Bulk create
+   • POST   /admin/permissions/sync-module - Sync module permissions
+
+9.5 PROFILE & SETTINGS ENDPOINTS
+   • GET    /settings/profile           - View profile
+   • PATCH  /settings/profile           - Update profile
+   • DELETE /settings/profile           - Delete account
+   • GET    /settings/password          - Change password form
+   • PUT    /settings/password          - Update password
+   • GET    /settings/two-factor        - 2FA settings
+   • POST   /settings/two-factor/email  - Enable email 2FA
+   • POST   /settings/two-factor/totp   - Enable TOTP 2FA
+
+================================================================================
+10. FRONTEND COMPONENTS
+================================================================================
+
+10.1 LAYOUT COMPONENTS
+   • AppLayout - Main application layout
+   • AuthLayout - Authentication pages layout
+   • AppSidebar - Side navigation menu
+   • AppHeader - Top navigation bar
+   • Breadcrumbs - Navigation breadcrumbs
+   • NavUser - User menu in sidebar
+   • UserMenuContent - User dropdown menu
+
+10.2 UI COMPONENTS (shadcn/ui)
+   • Button - Action buttons
+   • Card - Content containers
+   • Dialog - Modal dialogs
+   • Input - Text input fields
+   • Label - Form field labels
+   • Select - Dropdown selections
+   • Table - Data tables
+   • Badge - Status indicators
+   • Checkbox - Checkbox inputs
+   • Textarea - Multi-line text input
+   • Toast - Notification messages
+   • Tooltip - Hover tooltips
+   • Sheet - Side panels
+   • DropdownMenu - Context menus
+
+10.3 PAGE COMPONENTS
+   • Dashboard - Main dashboard
+   • Login - Login page
+   • TwoFactorChallenge - 2FA verification
+   • PasswordSetup - Initial password setup
+   • ForgotPassword - Password reset request
+   • ResetPassword - Password reset form
+   • Users Index - User list
+   • Users Create - Create user form
+   • Users Edit - Edit user form
+   • Roles Index - Role list
+   • Roles Create - Create role form
+   • Roles Edit - Edit role form
+   • Permissions Index - Permission list
+   • Permissions Create - Create permission form
+   • Permissions Edit - Edit permission form
+   • Profile - User profile page
+   • Settings - User settings
+
+================================================================================
+11. MIDDLEWARE & SECURITY
+================================================================================
+
+11.1 MIDDLEWARE STACK
+   • EncryptCookies - Cookie encryption
+   • AddQueuedCookiesToResponse - Queue cookie handling
+   • StartSession - Session initialization
+   • ShareErrorsFromSession - Error message sharing
+   • VerifyCsrfToken - CSRF protection
+   • SubstituteBindings - Route model binding
+   • HandleInertiaRequests - Inertia.js handling
+
+11.2 CUSTOM MIDDLEWARE
+   • CheckRole - Role-based access control
+   • CheckPermission - Permission verification
+   • EnsureTwoFactorEnabled - 2FA enforcement
+
+11.3 SECURITY MEASURES
+   • Password Hashing - Bcrypt with 12 rounds
+   • CSRF Protection - Token validation
+   • XSS Prevention - React escaping
+   • SQL Injection Prevention - Eloquent ORM
+   • Rate Limiting - Login throttling
+   • Session Security - HTTP-only cookies
+   • HTTPS Enforcement - SSL/TLS required
+
+================================================================================
+12. EMAIL NOTIFICATIONS
+================================================================================
+
+12.1 EMAIL TEMPLATES
+   • WelcomeUserNotification
+     - Subject: Welcome to Raqtan Vendor Tool
+     - Contains password setup link
+     - 48-hour expiration
+
+   • EmailTwoFactorCodeNotification
+     - Subject: Login Verification Code
+     - 6-digit OTP code
+     - 10-minute expiration
+
+   • ResetPasswordNotification
+     - Subject: Password Reset Request
+     - Reset link with token
+     - 60-minute expiration
+
+12.2 EMAIL CONFIGURATION
+   • Mailer: SMTP (AWS SES)
+   • From Address: info@raqtan.com
+   • From Name: Raqtan Vendor Tool
+   • Encryption: TLS
+   • Port: 587
+
+================================================================================
+13. SYSTEM CONFIGURATION
+================================================================================
+
+13.1 ENVIRONMENT VARIABLES
+   • APP_NAME="Raqtan Vendor Tool"
+   • APP_ENV=local/production
+   • APP_DEBUG=true/false
+   • APP_URL=http://localhost:8000
+   • DB_CONNECTION=mysql
+   • DB_HOST=127.0.0.1
+   • DB_PORT=3307
+   • DB_DATABASE=vendor_invoicing_dashboard
+   • SESSION_DRIVER=database
+   • CACHE_STORE=database
+   • QUEUE_CONNECTION=database
+   • MAIL_MAILER=smtp
+   • GOOGLE_CLIENT_ID=[OAuth Client ID]
+   • GOOGLE_CLIENT_SECRET=[OAuth Secret]
+
+13.2 CACHE CONFIGURATION
+   • Default Store: Database
+   • Cache TTL: 3600 seconds
+   • Permission Cache: Per-user basis
+   • Clear on: Role/Permission changes
+
+13.3 SESSION CONFIGURATION
+   • Driver: Database
+   • Lifetime: 120 minutes
+   • Encrypt: False
+   • HTTP Only: True
+   • Same Site: Lax
+
+================================================================================
+14. DEVELOPMENT TOOLS
+================================================================================
+
+14.1 BACKEND TOOLS
+   • PHP 8.2+
+   • Laravel 11
+   • Composer 2.x
+   • Laravel Fortify
+   • Laravel Sanctum
+   • Inertia.js Server-side
+
+14.2 FRONTEND TOOLS
+   • Node.js 18+
+   • npm/yarn
+   • Vite 5.x
+   • React 18
+   • TypeScript 5.x
+   • Tailwind CSS 3.x
+   • shadcn/ui components
+
+14.3 DEVELOPMENT ENVIRONMENT
+   • Laragon (Windows)
+   • MySQL 8.0
+   • Git Version Control
+   • VS Code / PHPStorm
+
+================================================================================
+15. TESTING & QUALITY ASSURANCE
+================================================================================
+
+15.1 TESTING STRATEGY
+   • Unit Tests - Model and Service testing
+   • Feature Tests - Controller testing
+   • Integration Tests - API endpoint testing
+   • Frontend Tests - React component testing
+   • E2E Tests - User workflow testing
+
+15.2 CODE QUALITY
+   • PSR-12 Coding Standards
+   • ESLint for JavaScript/TypeScript
+   • Prettier for Code Formatting
+   • PHPStan for Static Analysis
+   • Laravel Pint for Code Style
+
+================================================================================
+16. DEPLOYMENT & MAINTENANCE
+================================================================================
+
+16.1 DEPLOYMENT REQUIREMENTS
+   • PHP 8.2+ with required extensions
+   • MySQL 8.0+
+   • Node.js for asset compilation
+   • SSL Certificate for HTTPS
+   • Queue Worker for background jobs
+   • Cron Job for scheduled tasks
+
+16.2 DEPLOYMENT STEPS
+   1. Clone repository
+   2. Install PHP dependencies: composer install
+   3. Install JS dependencies: npm install
+   4. Copy .env file and configure
+   5. Generate app key: php artisan key:generate
+   6. Run migrations: php artisan migrate
+   7. Seed database: php artisan db:seed
+   8. Build assets: npm run build
+   9. Set permissions on storage/cache
+   10. Configure web server
+
+16.3 MAINTENANCE TASKS
+   • Daily database backups
+   • Log rotation weekly
+   • Security updates monthly
+   • Performance monitoring
+   • Error tracking and resolution
+
+================================================================================
+17. FUTURE ENHANCEMENTS (PLANNED)
+================================================================================
+
+17.1 INVOICE MANAGEMENT
+   • Invoice creation and editing
+   • Invoice approval workflow
+   • PDF generation
+   • Email notifications
+   • Invoice tracking
+
+17.2 PAYMENT PROCESSING
+   • Payment request creation
+   • Approval hierarchy
+   • Payment status tracking
+   • Payment history
+   • Financial reports
+
+17.3 VENDOR MANAGEMENT
+   • Vendor registration
+   • Vendor profiles
+   • Document management
+   • Communication portal
+   • Performance metrics
+
+17.4 REPORTING & ANALYTICS
+   • Dashboard widgets
+   • Custom reports
+   • Export functionality
+   • Scheduled reports
+   • Data visualization
+
+17.5 AUDIT & COMPLIANCE
+   • Activity logging
+   • Audit trails
+   • Compliance reports
+   • Data retention policies
+   • Security audits
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================

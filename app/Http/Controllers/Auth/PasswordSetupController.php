@@ -59,16 +59,14 @@ class PasswordSetupController extends Controller
         // Delete the token
         $tokenRecord->delete();
 
-        // Log the user in
-        Auth::login($user);
-
-        // Check if user needs 2FA setup
+        // Enable email 2FA by default for new users
         if ($user->needsTwoFactorSetup()) {
-            return redirect()->route('two-factor.setup')
-                ->with('success', 'Password set successfully. Please set up two-factor authentication.');
+            $user->enableEmailTwoFactor();
         }
 
-        return redirect()->route('dashboard')
-            ->with('success', 'Password set successfully. Welcome!');
+        // DO NOT log the user in - force them to authenticate with 2FA
+        // Redirect to login page where they will be required to use 2FA
+        return redirect()->route('login')
+            ->with('success', 'Password set successfully! Please log in with your email and password. You will receive a verification code via email.');
     }
 }

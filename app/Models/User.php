@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\HasRoles;
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,7 +15,24 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles, LogsActivity;
+
+    /**
+     * The log name for activity logging.
+     */
+    protected static string $activityLogName = 'user-management';
+
+    /**
+     * The attributes to log for activity.
+     */
+    protected static array $loggableAttributes = [
+        'name',
+        'email',
+        'is_admin',
+        'is_active',
+        'two_factor_method',
+        'role_id',
+    ];
 
     /**
      * The attributes that are mass assignable.
