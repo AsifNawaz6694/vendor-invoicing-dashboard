@@ -12,6 +12,8 @@
 /vendor
 .DS_Store
 .env
+composer.lock
+package-lock.json
 .env.backup
 .env.production
 .env.local
